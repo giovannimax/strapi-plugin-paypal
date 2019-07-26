@@ -20,9 +20,25 @@ module.exports = {
 
   index: async (ctx) => {
     // Add your own logic here.
+    console.log(strapi.models.payments);
+    let config = strapi.config.paypal;
 
-    paypal.configure(strapi.config.paypal);
+    paypal.configure(config);
 
+    let items = [];
+    let order = await strapi.models.orders
+        .findOne({ _id: ctx.query.orderId});
+        order.items.forEach(x => {
+            let item = {
+                name: x.name,
+                sku: x.id,
+                price: x.price,
+                currency: config.currency,
+                quantity: x.qty
+            }
+            items.push(item);
+        });
+    
     var create_payment_json = {
         "intent": "sale",
         "payer": {
@@ -33,22 +49,16 @@ module.exports = {
             "cancel_url": "http://cancel.url"
         },
         "transactions": [{
-            "order_id": "xx", // post/query
-            "redirect_url": "yy", // post/query
+            // "order_id": "xx", // post/query
+            // "redirect_url": "yy", // post/query
             "item_list": {
-                "items": [{
-                    "name": "item",
-                    "sku": "item",
-                    "price": "1.00",
-                    "currency": "USD",
-                    "quantity": 1
-                }]
+                "items": items
             },
             "amount": {
-                "currency": "USD",
-                "total": "1.00"
+                "currency": config.currency,
+                "total": order.meta.total
             },
-            "description": "This is the payment description."
+            "description": `Payment for orderID: ${ctx.query.orderId}`
         }]
     };
 
@@ -81,6 +91,17 @@ module.exports = {
 
     console.log(payment);
 
+    Payments.create({
+        payID: payment.id,
+        meta: {
+            amount: payment.transactions[0].amount
+        },
+        orderId: ctx.query.orderId,
+        status: "waiting for approval",
+        date: new Date()
+     })
+    
+
     ctx.send(payment);
   },
 
@@ -92,33 +113,38 @@ module.exports = {
     console.log('------------------------');
     console.log(q);
 
+    let config = strapi.config.paypal;
+
     var paymentId = q.paymentId; //'PAYMENT id created in previous step';
 
+    let pay = await Payments.findOne({payID: paymentId});
+
+    let order = await Orders.findOne({ _id: pay.orderId});
     var execute_payment_json = {
         "payer_id": q.PayerID,
         "transactions": [{
             "amount": {
-                "currency": "USD",
-                "total": "1.00"
+                "currency": config.currency,
+                "total": order.meta.total
             }
         }]
     };
+    
 
-    paypal.payment.execute(paymentId, execute_payment_json, function (error, payment) {
+    paypal.payment.execute(paymentId, execute_payment_json, async function (error, payment) {
         if (error) {
             console.log(error.response);
             // throw error;
+            ctx.send({
+                message: ctx
+              });
         } else {
             console.log("Get Payment Response");
             console.log(JSON.stringify(payment));
+            await Payments.updateOne({payID: paymentId}, {status: "completed"});
         }
     });
-
-    ctx.send({
-      message: ctx
-    });
-
-    // redirect ...
+    ctx.redirect(`${strapi.config.app.url}${strapi.config.paypal.post_payment_redirect}${order._id}`);
   },
 
   cancelled: async (ctx) => {
