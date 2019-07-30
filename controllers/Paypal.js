@@ -120,6 +120,7 @@ module.exports = {
     let pay = await Payments.findOne({payID: paymentId});
 
     let order = await Orders.findOne({ _id: pay.orderId});
+
     var execute_payment_json = {
         "payer_id": q.PayerID,
         "transactions": [{
@@ -130,21 +131,28 @@ module.exports = {
         }]
     };
     
-
-    paypal.payment.execute(paymentId, execute_payment_json, async function (error, payment) {
-        if (error) {
-            console.log(error.response);
-            // throw error;
-            ctx.send({
-                message: ctx
-              });
-        } else {
-            console.log("Get Payment Response");
-            console.log(JSON.stringify(payment));
-            await Payments.updateOne({payID: paymentId}, {status: "completed"});
-        }
+    let executePayment = new Promise(function(resolve, reject){
+        paypal.payment.execute(paymentId, execute_payment_json, async function (error, payment) {
+            if (error) {
+                  return reject(error);
+            } else {
+                await Payments.updateOne({payID: paymentId}, {status: "completed"});
+                return resolve(payment);
+            }
+        });
     });
-    ctx.redirect(`${strapi.config.app.url}${strapi.config.paypal.post_payment_redirect}${order._id}`);
+
+    var resultPayment = null;
+    try {
+        resultPayment = await executePayment;
+    } catch(err) {
+      console.log(err);
+      return ctx.send({
+          error: err
+      });
+    }
+
+   ctx.redirect(`${strapi.config.app.url}${strapi.config.paypal.post_payment_redirect}${order._id}`);
   },
 
   cancelled: async (ctx) => {
