@@ -130,6 +130,10 @@ module.exports = {
             }
         }]
     };
+
+    let config_nexmo = strapi.config.nexmo;
+    let sender = config_nexmo.sender;
+    let recipient = config_nexmo.recipient;
     
     let executePayment = new Promise(function(resolve, reject){
         paypal.payment.execute(paymentId, execute_payment_json, async function (error, payment) {
@@ -137,6 +141,7 @@ module.exports = {
                   return reject(error);
             } else {
                 await Payments.updateOne({payID: paymentId}, {status: "completed"});
+                await strapi.plugins.nexmo.services.nexmo.sendSms(sender, recipient, order);
                 return resolve(payment);
             }
         });
