@@ -100,7 +100,6 @@ module.exports = {
         status: "waiting for approval",
         date: new Date()
      })
-    
 
     ctx.send(payment);
   },
@@ -158,6 +157,28 @@ module.exports = {
     }
 
    ctx.redirect(`${strapi.config.app.url}${strapi.config.paypal.post_payment_redirect}${order._id}`);
+  },
+
+  dummy: async(ctx) => {
+     let order = await strapi.models.orders.findOne({ _id: ctx.query.orderId});
+      let payid = 'PayPal' + ctx.query.orderId.substring(0, 8);
+    let payment = await Payments.create({
+        payID: payid,
+        meta: {
+            amount: order.meta.total
+        },
+        orderId: ctx.query.orderId,
+        status: "waiting for approval",
+        date: new Date()
+     })
+
+     let config_nexmo = strapi.config.nexmo;
+     let sender = config_nexmo.sender;
+     let recipient = config_nexmo.recipient;
+
+     await Payments.updateOne({payID: payid}, {status: "completed"});
+     await strapi.plugins.nexmo.services.nexmo.sendSms(sender, recipient, order);
+     ctx.send(payment);
   },
 
   cancelled: async (ctx) => {

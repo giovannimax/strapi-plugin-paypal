@@ -25,6 +25,14 @@
       "config": {
         "policies": []
       }
+    },
+    {
+      "method": "GET",
+      "path": "/dummy",
+      "handler": "Paypal.dummy",
+      "config": {
+        "policies": []
+      }
     }
   ]
 }
