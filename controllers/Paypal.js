@@ -45,7 +45,7 @@ module.exports = {
             "payment_method": "paypal"
         },
         "redirect_urls": {
-            "return_url": "http://localhost:1337/paypal/completed",
+            "return_url": `${strapi.config.paymentServer.server}paypal/completed`,
             "cancel_url": "http://cancel.url"
         },
         "transactions": [{
@@ -62,6 +62,7 @@ module.exports = {
         }]
     };
 
+    console.log(create_payment_json);
 
     var createPayment = new Promise(function(resolve, reject) {
       paypal.payment.create(create_payment_json, function (error, payment) {
@@ -149,6 +150,7 @@ module.exports = {
     var resultPayment = null;
     try {
         resultPayment = await executePayment;
+        console.log(resultPayment);
     } catch(err) {
       console.log(err);
       return ctx.send({
@@ -156,7 +158,8 @@ module.exports = {
       });
     }
 
-   ctx.redirect(`${strapi.config.app.url}${strapi.config.paypal.post_payment_redirect}${order._id}`);
+    return ctx.redirect('/postpaymaya/success.html');
+   //ctx.redirect(`${strapi.config.app.url}${strapi.config.paypal.post_payment_redirect}${order._id}`);
   },
 
   dummy: async(ctx) => {
@@ -170,7 +173,7 @@ module.exports = {
         orderId: ctx.query.orderId,
         status: "waiting for approval",
         date: new Date()
-     })
+     });
 
      let config_nexmo = strapi.config.nexmo;
      let sender = config_nexmo.sender;
